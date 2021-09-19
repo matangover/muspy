@@ -74,4 +74,5 @@ setup(
         "Topic :: Multimedia :: Sound/Audio",
     ],
     python_requires=">=3.6",
+    package_data={"muspy": ["py.typed"]},
 )
