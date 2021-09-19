@@ -98,7 +98,8 @@ def from_event_representation(
     # Decode events
     time = 0
     velocity = default_velocity
-    velocity_factor = 128 / velocity_bins
+    if velocity_bins > 0:
+        velocity_factor = 128 / velocity_bins
     notes = []
 
     # Keep track of active note on messages
