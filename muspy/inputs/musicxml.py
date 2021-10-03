@@ -430,7 +430,7 @@ def parse_part_elem(
                 if rest_elem is not None:
                     # Move time position forward if it is a rest
                     duration = int(_get_required_text(elem, "duration"))
-                    position += round(duration * resolution / division)
+                    position += get_duration(duration, resolution, division)
                     continue
 
                 # Cue notes
@@ -514,7 +514,7 @@ def parse_part_elem(
                         Note(
                             time=time + position,
                             pitch=pitch,
-                            duration=round(duration * resolution / division),
+                            duration=get_duration(duration, resolution, division),
                             velocity=velocity,
                             pitch_str=pitch_str,
                         )
@@ -541,17 +541,17 @@ def parse_part_elem(
 
                 # Move time position forward if it is not in chord
                 last_note_position = position
-                position += round(duration * resolution / division)
+                position += get_duration(duration, resolution, division)
 
             # Forward elements
             elif elem.tag == "forward":
                 duration = int(_get_required_text(elem, "duration"))
-                position += round(duration * resolution / division)
+                position += get_duration(duration, resolution, division)
 
             # Backup elements
             elif elem.tag == "backup":
                 duration = int(_get_required_text(elem, "duration"))
-                position -= round(duration * resolution / division)
+                position -= get_duration(duration, resolution, division)
 
         time += position
 
@@ -586,6 +586,18 @@ def parse_part_elem(
         "notes": notes,
         "lyrics": lyrics,
     }
+
+
+def get_duration(duration, resolution, division):
+    duration_steps = duration * resolution / division
+    if duration_steps.is_integer():
+        return int(duration_steps)
+    
+    raise MusicXMLError(
+        f"MusicXML duration is not a multiple of the muspy time step. "
+        f"Duration: {duration}, MusicXML division: {division}, " +
+        f"muspy resolution: {resolution}"
+    )
 
 
 def parse_metadata(root: Element) -> Metadata:
