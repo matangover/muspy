@@ -85,6 +85,9 @@ class Dataset:
     def __len__(self) -> int:
         raise NotImplementedError
 
+    def _get_id(self, index) -> Union[str, None]:
+        return None
+
     @classmethod
     def info(cls):
         """Return the dataset infomation."""
@@ -139,8 +142,8 @@ class Dataset:
                     with warnings.catch_warnings():
                         warnings.simplefilter("ignore")
                         save(filename, self[idx], kind, **kwargs)
-                except Exception:  # pylint: disable=broad-except
-                    return False
+                except Exception as e:  # pylint: disable=broad-except
+                    return e
                 return True
             save(filename, self[idx], kind, **kwargs)
             return True
@@ -150,18 +153,25 @@ class Dataset:
         if verbose:
             print("Converting and saving the dataset...")
         if n_jobs == 1:
-            count = 0
-            for idx in tqdm(range(len(self))):  # type: ignore
-                if _saver(idx):
-                    count += 1
+            results = [_saver(idx) for idx in tqdm(range(len(self)))]  # type: ignore
         else:
             # TODO: This is slow as `self` is passed between workers.
             results = Parallel(n_jobs=n_jobs, backend="threading", verbose=5)(
                 delayed(_saver)(idx) for idx in range(len(self))
             )
-            count = results.count(True)
+        
         if verbose:
-            print(f"Successfully saved {count} out of {len(self)} files.")
+            success_count = results.count(True)
+            print(f"Successfully saved {success_count} out of {len(self)} files.")
+            errors = [(i, result) for i, result in enumerate(results) if result != True]
+            if errors:
+                print("Errors:")
+                for i, error in errors:
+                    score_desc = f"Item {i}"
+                    score_id = self._get_id(i)
+                    if score_id is not None:
+                        score_desc += f" ({score_id})"
+                    print(f"{score_desc}:\n  {error}")
 
     def split(
         self,
@@ -927,6 +937,9 @@ class FolderDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self._filenames)
+
+    def _get_id(self, index):
+        return Path(self._filenames[index]).name
 
     def read(self, filename: Any) -> Music:
         """Read a file into a Music object."""
