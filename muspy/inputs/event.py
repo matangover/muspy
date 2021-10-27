@@ -137,12 +137,15 @@ def from_event_representation(
                             note.duration = int(time - note.time)
                             notes.append(note)
                     active_notes = defaultdict(list)
+                else:
+                    print(f"Warning: note off without note on")
                 continue
 
             pitch = event - offset_note_off
 
             # Skip it if there is no active notes
             if not active_notes[pitch]:
+                print(f"Warning: note off (pitch: {pitch}, time: {time}) without note on")
                 continue
 
             # NOTE: There is no way to disambiguate duplicate notes of
@@ -177,6 +180,10 @@ def from_event_representation(
         # Velocity events
         elif event < vocab_size:
             velocity = int((event - offset_velocity) * velocity_factor)
+
+    for pitch, pitch_notes in active_notes.items():
+        for note in pitch_notes:
+            print(f"Warning: note on (pitch: {pitch}, time: {note.time}) without note off")
 
     # Sort the notes
     notes.sort(key=attrgetter("time", "pitch", "duration", "velocity"))
