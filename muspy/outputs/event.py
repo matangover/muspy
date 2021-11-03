@@ -67,6 +67,7 @@ def to_event_representation(
     # Collect notes
     notes = []
     for track in music.tracks:
+        assert not track.chords, "Chords are not supported"
         notes.extend(track.notes)
 
     # Raise an error if no notes is found
@@ -240,6 +241,7 @@ def to_default_event_sequence(music: "Music") -> DefaultEventSequence:
     # Collect notes
     notes = []
     for track in music.tracks:
+        assert not track.chords, "Chords are not supported"
         notes.extend(track.notes)
 
     # Raise an error if no notes is found
@@ -349,6 +351,7 @@ def to_performance_event_sequence(music: "Music") -> PerformanceEventSequence:
     # Collect notes
     notes = []
     for track in music.tracks:
+        assert not track.chords, "Chords are not supported"
         notes.extend(track.notes)
 
     # Raise an error if no notes is found
@@ -464,6 +467,7 @@ def to_remi_event_sequence(music: "Music") -> REMIEventSequence:
     # Collect notes
     notes = []
     for track in music.tracks:
+        assert not track.chords, "Chords are not supported"
         notes.extend(track.notes)
 
     # Raise an error if no notes is found

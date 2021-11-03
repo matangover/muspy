@@ -136,6 +136,8 @@ def to_music21(music: "Music") -> Score:
             m21_note.quarterLength = note.duration / music.resolution
             part.insert(m21_note)
 
+        assert not track.chords, "Chords are not supported"
+
         # Append the part to score
         score.append(part)
 
