@@ -48,7 +48,9 @@ def parse_metadata(stream: Stream) -> Union[Metadata, None]:
             copyright_ = item[1]
 
     return Metadata(
-        title=stream.metadata.title, creators=creators, copyright=copyright_,
+        title=stream.metadata.title,
+        creators=creators,
+        copyright=copyright_,
     )
 
 
@@ -210,7 +212,9 @@ def parse_beats(
 
 
 def parse_notes_and_chords(
-    stream: Stream, resolution: int = DEFAULT_RESOLUTION
+    stream: Stream,
+    resolution: int = DEFAULT_RESOLUTION,
+    import_chords_as_notes: bool = False,
 ) -> Tuple[List[Note], List[Chord]]:
     """Return notes and chords parsed from a music21 Stream object.
 
@@ -250,41 +254,55 @@ def parse_notes_and_chords(
             velocity = round(velocity)
 
         if item.isNote:
-            pitch = int(item.pitch.midi)
-            is_outgoing_tie = item.tie and (
-                item.tie.type == "start" or item.tie.type == "continue"
-            )
-            if pitch in ties:
-                note_idx = ties[pitch]
-                notes[note_idx].duration += duration
-                if is_outgoing_tie:
-                    ties[pitch] = note_idx
-                else:
-                    del ties[pitch]
+            _add_note(notes, ties, item, time, duration, velocity)
+        elif item.isChord:
+            if import_chords_as_notes:
+                for note in item.notes:
+                    _add_note(notes, ties, note, time, duration, velocity)
             else:
-                note = Note(
+                assert (
+                    not item.tie
+                ), "Tied chords are not supported, you might want to try import_chords_as_notes=True"
+                chord = Chord(
                     time=time,
-                    pitch=int(item.pitch.midi),
+                    pitches=[int(note.pitch.midi) for note in item.notes],
                     duration=duration,
                     velocity=velocity,
                 )
-                notes.append(note)
-                if is_outgoing_tie:
-                    ties[pitch] = len(notes) - 1
-
-        elif item.isChord:
-            chord = Chord(
-                time=time,
-                pitches=[int(note.pitch.midi) for note in item.notes],
-                duration=duration,
-                velocity=velocity,
-            )
-            chords.append(chord)
+                chords.append(chord)
 
     return notes, chords
 
 
-def parse_track(part: Part, resolution: int = DEFAULT_RESOLUTION) -> Track:
+def _add_note(notes, ties, item, time, duration, velocity):
+    pitch = int(item.pitch.midi)
+    is_outgoing_tie = item.tie and (
+        item.tie.type == "start" or item.tie.type == "continue"
+    )
+    if pitch in ties:
+        note_idx = ties[pitch]
+        notes[note_idx].duration += duration
+        if is_outgoing_tie:
+            ties[pitch] = note_idx
+        else:
+            del ties[pitch]
+    else:
+        note = Note(
+            time=time,
+            pitch=int(item.pitch.midi),
+            duration=duration,
+            velocity=velocity,
+        )
+        notes.append(note)
+        if is_outgoing_tie:
+            ties[pitch] = len(notes) - 1
+
+
+def parse_track(
+    part: Part,
+    resolution: int = DEFAULT_RESOLUTION,
+    import_chords_as_notes: bool = False,
+) -> Track:
     """Return track parsed from a music21 Part object.
 
     Parameters
@@ -300,7 +318,9 @@ def parse_track(part: Part, resolution: int = DEFAULT_RESOLUTION) -> Track:
         Parsed track.
 
     """
-    notes, chords = parse_notes_and_chords(part, resolution)
+    notes, chords = parse_notes_and_chords(
+        part, resolution, import_chords_as_notes
+    )
 
     instrument = part.getInstrument()
 
@@ -324,7 +344,9 @@ def parse_track(part: Part, resolution: int = DEFAULT_RESOLUTION) -> Track:
 
 
 def from_music21_part(
-    part: Part, resolution: int = DEFAULT_RESOLUTION
+    part: Part,
+    resolution: int = DEFAULT_RESOLUTION,
+    import_chords_as_notes: bool = False,
 ) -> Union[Track, List[Track]]:
     """Return a music21 Part object as Track object(s).
 
@@ -343,12 +365,17 @@ def from_music21_part(
     """
     instruments = partitionByInstrument(part)
     if not instruments:
-        return parse_track(part, resolution)
-    return [parse_track(instrument, resolution) for instrument in instruments]
+        return parse_track(part, resolution, import_chords_as_notes)
+    return [
+        parse_track(instrument, resolution, import_chords_as_notes)
+        for instrument in instruments
+    ]
 
 
 def from_music21_score(
-    score: Score, resolution: int = DEFAULT_RESOLUTION
+    score: Score,
+    resolution: int = DEFAULT_RESOLUTION,
+    import_chords_as_notes: bool = False,
 ) -> Music:
     """Return a music21 Stream object as a Music object.
 
@@ -370,16 +397,20 @@ def from_music21_score(
         instruments = partitionByInstrument(part)
         if instruments:
             for instrument in instruments:
-                tracks.append(parse_track(instrument))
+                tracks.append(
+                    parse_track(instrument, resolution, import_chords_as_notes)
+                )
         elif len(part.flat.notesAndRests) > 0:
-            tracks.append(parse_track(part))
+            tracks.append(
+                parse_track(part, resolution, import_chords_as_notes)
+            )
 
     time_signatures = parse_time_signatures(score, resolution)
     beats = parse_beats(score, time_signatures, resolution)
 
     return Music(
         metadata=parse_metadata(score),
-        resolution=DEFAULT_RESOLUTION,
+        resolution=resolution,
         tempos=parse_tempos(score),
         key_signatures=parse_key_signatures(score, resolution),
         time_signatures=time_signatures,
@@ -389,7 +420,9 @@ def from_music21_score(
 
 
 def from_music21_opus(
-    opus: Opus, resolution: int = DEFAULT_RESOLUTION
+    opus: Opus,
+    resolution: int = DEFAULT_RESOLUTION,
+    import_chords_as_notes: bool = False,
 ) -> List[Music]:
     """Return a music21 Opus object as a list of Music objects.
 
@@ -406,11 +439,16 @@ def from_music21_opus(
         Converted Music object.
 
     """
-    return [from_music21_score(score, resolution) for score in opus.scores]
+    return [
+        from_music21_score(score, resolution, import_chords_as_notes)
+        for score in opus.scores
+    ]
 
 
 def from_music21(
-    stream: Stream, resolution: int = DEFAULT_RESOLUTION
+    stream: Stream,
+    resolution: int = DEFAULT_RESOLUTION,
+    import_chords_as_notes: bool = False,
 ) -> Union[Music, List[Music], Track, List[Track]]:
     """Return a music21 Stream object as Music or Track object(s).
 
@@ -428,8 +466,8 @@ def from_music21(
 
     """
     if isinstance(stream, Opus):
-        return from_music21_opus(stream, resolution)
+        return from_music21_opus(stream, resolution, import_chords_as_notes)
     elif isinstance(stream, Part):
-        return from_music21_part(stream, resolution)
+        return from_music21_part(stream, resolution, import_chords_as_notes)
     else:
-        return from_music21_score(stream, resolution)
+        return from_music21_score(stream, resolution, import_chords_as_notes)
