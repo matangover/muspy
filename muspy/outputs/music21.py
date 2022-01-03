@@ -18,11 +18,6 @@ if TYPE_CHECKING:
 PITCH_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
-def _get_pitch_name(note_number: int) -> str:
-    octave, pitch_class = divmod(note_number, 12)
-    return PITCH_NAMES[pitch_class] + str(octave - 1)
-
-
 def to_music21_metronome(tempo: Tempo) -> MetronomeMark:
     """Return a Tempo object as a music21 MetronomeMark object."""
     metronome = MetronomeMark(number=tempo.qpm)
@@ -131,7 +126,7 @@ def to_music21(music: "Music") -> Score:
 
         # Add notes to part
         for note in track.notes:
-            m21_note = M21Note(_get_pitch_name(note.pitch))
+            m21_note = M21Note(midi=note.pitch)
             m21_note.offset = note.time / music.resolution
             m21_note.quarterLength = note.duration / music.resolution
             part.insert(m21_note)
