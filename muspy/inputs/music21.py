@@ -75,7 +75,7 @@ def parse_tempos(
     tempos = set()
     for start, _, metronome in stream.flat.metronomeMarkBoundaries():
         tempo = Tempo(
-            time=round(float(start * resolution)),
+            time=get_time(start, resolution),
             qpm=metronome.getQuarterBPM(),
         )
         tempos.add(tempo)
@@ -105,7 +105,7 @@ def parse_key_signatures(
         if isinstance(item, Key):
             key_signatures.add(
                 KeySignature(
-                    time=round(float(item.offset * resolution)),
+                    time=get_time(item.offset, resolution),
                     root=item.tonic.pitchClass,
                     mode=item.mode,
                     fifths=item.sharps,
@@ -114,7 +114,7 @@ def parse_key_signatures(
         else:
             key_signatures.add(
                 KeySignature(
-                    time=round(float(item.offset * resolution)),
+                    time=get_time(item.offset, resolution),
                     fifths=item.sharps,
                 )
             )
@@ -142,7 +142,7 @@ def parse_time_signatures(
     time_signatures = set()
     for item in stream.flat.getTimeSignatures():
         time_signature = TimeSignature(
-            time=round(float(item.offset * resolution)),
+            time=get_time(item.offset, resolution),
             numerator=item.numerator,
             denominator=item.denominator,
         )
@@ -175,7 +175,7 @@ def parse_beats(
     beats: List[Beat] = []
     measure_offset_map = stream.measureOffsetMap()
     downbeats = list(
-        round(float(offset * resolution))
+        get_time(offset, resolution)
         for offset in measure_offset_map.keys()
     )
     downbeats.sort()
@@ -192,6 +192,7 @@ def parse_beats(
         # Set time signature
         time_sign = time_signatures[time_sign_idx]
         beat_resolution = resolution / (time_sign.denominator / 4)
+        assert beat_resolution.is_integer(), f"Cannot represent time signature denominator ({time_sign.denominator}) with given resolution ({resolution})."
         # Get the next downbeat
         if downbeat_idx < len(downbeats) - 1:
             end: float = downbeats[downbeat_idx + 1]
@@ -247,8 +248,8 @@ def parse_notes_and_chords(
             continue
 
         # Parse note
-        time = round(float(item.offset * resolution))
-        duration = round(float(item.quarterLength) * resolution)
+        time = get_time(item.offset, resolution)
+        duration = get_time(float(item.quarterLength), resolution)
         velocity = item.volume.velocity
         if velocity is not None:
             velocity = round(velocity)
@@ -471,3 +472,15 @@ def from_music21(
         return from_music21_part(stream, resolution, import_chords_as_notes)
     else:
         return from_music21_score(stream, resolution, import_chords_as_notes)
+
+
+def get_time(time: float, resolution: int):
+    time_steps = time * resolution
+    if time_steps.is_integer():
+        return int(time_steps)
+    
+    raise ValueError(
+        f"Time value cannot be represented by the muspy resolution. "
+        f"Time: {time}, resolution: {resolution}"
+    )
+
