@@ -5,7 +5,7 @@ from music21.key import Key
 from music21.metadata import Contributor, Copyright
 from music21.metadata import Metadata as M21MetaData
 from music21.meter import TimeSignature as M21TimeSignature
-from music21.note import Note as M21Note
+from music21.note import Note as M21Note, Rest as M21Rest
 from music21.stream import Part, Score
 from music21.tempo import MetronomeMark
 
@@ -107,6 +107,7 @@ def to_music21(music: "Music") -> Score:
         score.append(to_music21_metadata(music.metadata))
 
     # Tracks
+    end_time = get_end_time(music)
     for track in music.tracks:
         # Create a new part
         part = Part()
@@ -130,6 +131,15 @@ def to_music21(music: "Music") -> Score:
             m21_note.offset = note.time / music.resolution
             m21_note.quarterLength = note.duration / music.resolution
             part.insert(m21_note)
+        
+        last_note_end: float = 0
+        if track.notes:
+            last_note_end = track.notes[-1].end
+        if last_note_end < end_time:
+            m21_rest = M21Rest()
+            m21_rest.offset = last_note_end / music.resolution
+            m21_rest.quarterLength = (end_time - last_note_end) / music.resolution
+            part.insert(m21_rest)
 
         assert not track.chords, "Chords are not supported"
 
@@ -137,3 +147,15 @@ def to_music21(music: "Music") -> Score:
         score.append(part)
 
     return score
+
+def get_end_time(music: "Music") -> int:
+    end_time = music.get_end_time()
+    if len(music.beats) >= 2:
+        # Assume that the two last beats have the same duration, because we don't have the end time
+        # of the last beat.
+        before_last_beat_duration = music.beats[-1].time - music.beats[-2].time
+        last_beat_end_time = music.beats[-1].time + before_last_beat_duration
+        if last_beat_end_time > end_time:
+            end_time = last_beat_end_time
+
+    return end_time
