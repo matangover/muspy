@@ -164,7 +164,7 @@ class Music(ComplexBase):
     def __setitem__(self, key: int, value: Track):
         self.tracks[key] = value
 
-    def get_end_time(self, is_sorted: bool = False) -> int:
+    def get_end_time(self, is_sorted: bool = False, infer_last_beat_end: bool = False) -> int:
         """Return the the time of the last event in all tracks.
 
         This includes tempos, key signatures, time signatures, note
@@ -200,6 +200,14 @@ class Music(ComplexBase):
             _get_end_time(self.annotations),
             track_end_time,
         )
+
+        if infer_last_beat_end and len(self.beats) >= 2:
+            # Assume that the two last beats have the same duration, because we don't have the end time
+            # of the last beat.
+            before_last_beat_duration = self.beats[-1].time - self.beats[-2].time
+            last_beat_end_time = self.beats[-1].time + before_last_beat_duration
+            if last_beat_end_time > end_time:
+                end_time = last_beat_end_time
 
         return end_time
 

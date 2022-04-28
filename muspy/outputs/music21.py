@@ -107,7 +107,7 @@ def to_music21(music: "Music") -> Score:
         score.append(to_music21_metadata(music.metadata))
 
     # Tracks
-    end_time = get_end_time(music)
+    end_time = music.get_end_time(infer_last_beat_end=True)
     for track in music.tracks:
         # Create a new part
         part = Part()
@@ -147,15 +147,3 @@ def to_music21(music: "Music") -> Score:
         score.append(part)
 
     return score
-
-def get_end_time(music: "Music") -> int:
-    end_time = music.get_end_time()
-    if len(music.beats) >= 2:
-        # Assume that the two last beats have the same duration, because we don't have the end time
-        # of the last beat.
-        before_last_beat_duration = music.beats[-1].time - music.beats[-2].time
-        last_beat_end_time = music.beats[-1].time + before_last_beat_duration
-        if last_beat_end_time > end_time:
-            end_time = last_beat_end_time
-
-    return end_time
