@@ -83,6 +83,7 @@ def to_pianoroll_representation(
     music: "Music",
     encode_velocity: bool = True,
     dtype: Union[np.dtype, type, str] = None,
+    full_length: bool = False,
 ) -> ndarray:
     """Encode notes into piano-roll representation.
 
@@ -112,18 +113,18 @@ def to_pianoroll_representation(
         notes.extend(track.notes)
 
     # Raise an error if no notes are found
-    if not notes:
+    if not notes and not full_length:
         raise RuntimeError("No notes found.")
 
     # Sort the notes
     notes.sort(key=attrgetter("time", "pitch", "duration", "velocity"))
 
-    if not notes:
-        return np.zeros((0, 128), dtype)
-
     # Initialize the array
-    length = max((note.end for note in notes))
-    array = np.zeros((length + 1, 128), dtype)
+    if full_length:
+        length = music.get_end_time(infer_last_beat_end=True)
+    else:
+        length = max((note.end for note in notes)) + 1
+    array = np.zeros((length, 128), dtype)
 
     # Encode notes
     for note in notes:
